@@ -6,6 +6,102 @@
 #import <MessageUI/MFMessageComposeViewController.h>
 #import <MessageUI/MFMailComposeViewController.h>
 #import <MobileCoreServices/MobileCoreServices.h>
+#import <Photos/Photos.h>
+
+@interface MyCustomActivity : UIActivity
+@end
+
+@implementation MyCustomActivity
+
+- (NSString *)activityType
+{
+    return @"com.jobprogressapp.savetocameraroll";
+}
+
+- (NSString *)activityCategory
+{
+    return UIActivityCategoryAction;
+}
+
+- (NSString *)activityTitle
+{
+    return @"Save Image";
+}
+
+- (UIImage *)activityImage
+{
+    return [UIImage imageNamed:@"DownArrow.png"];
+}
+
+- (BOOL)canPerformWithActivityItems:(NSArray *)activityItems
+{
+    NSLog(@"%s", __FUNCTION__);
+    return YES;
+}
+
+- (void)prepareWithActivityItems:(NSArray *)activityItems
+{
+    for (NSArray* item in activityItems) {
+        if([item isKindOfClass:[UIImage class]]) {
+            UIImage* image = (UIImage *)item;
+            NSString *albumName = @"JobProgress";
+
+            void (^saveBlock)(PHAssetCollection *assetCollection) = ^void(PHAssetCollection *assetCollection) {
+
+                [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
+                    PHAssetChangeRequest* newAssetRequest = [PHAssetChangeRequest creationRequestForAssetFromImage:image];
+                    PHObjectPlaceholder* placeholderAsset = newAssetRequest.placeholderForCreatedAsset;
+                    PHAssetCollectionChangeRequest *addAssetRequest = [PHAssetCollectionChangeRequest changeRequestForAssetCollection:assetCollection];
+
+                    [addAssetRequest addAssets:@[placeholderAsset]];
+                } completionHandler:^(BOOL success, NSError *error) {
+                    if(!success) {
+                        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil);
+                    }
+                }];
+            };
+            
+            [PHPhotoLibrary requestAuthorization:^(PHAuthorizationStatus status) {
+                switch (status) {
+                        
+                    case PHAuthorizationStatusAuthorized:
+                        {
+                            PHFetchOptions *fetchOptions = [[PHFetchOptions alloc] init];
+                            fetchOptions.predicate = [NSPredicate predicateWithFormat:@"localizedTitle = %@", albumName];
+                            PHFetchResult *fetchResult = [PHAssetCollection fetchAssetCollectionsWithType:PHAssetCollectionTypeAlbum subtype:PHAssetCollectionSubtypeAny options:fetchOptions];
+                            
+                            if (fetchResult.count > 0) {
+                                saveBlock(fetchResult.firstObject);
+                            } else {
+                                __block PHObjectPlaceholder *albumPlaceholder;
+                                [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
+                                    PHAssetCollectionChangeRequest *changeRequest = [PHAssetCollectionChangeRequest creationRequestForAssetCollectionWithTitle:albumName];
+                                    albumPlaceholder = changeRequest.placeholderForCreatedAssetCollection;
+                                } completionHandler:^(BOOL success, NSError *error) {
+                                    if (success) {
+                                        PHFetchResult *fetchResult = [PHAssetCollection fetchAssetCollectionsWithLocalIdentifiers:@[albumPlaceholder.localIdentifier] options:nil];
+                                        if (fetchResult.count > 0) {
+                                            saveBlock(fetchResult.firstObject);
+                                        } else {
+                                            UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil);
+                                        }
+                                    } else {
+                                        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil);
+                                    }
+                                }];
+                            }
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }];
+        }
+    }
+}
+
+@end
+
 
 static NSString *const kShareOptionMessage = @"message";
 static NSString *const kShareOptionSubject = @"subject";
@@ -61,11 +157,13 @@ static NSString *const kShareOptionIPadCoordinates = @"iPadCoordinates";
 }
 
 - (void)shareWithOptions:(CDVInvokedUrlCommand*)command {
-  NSDictionary* options = [command.arguments objectAtIndex:0];
-  [self shareInternal:command
-          withOptions:options
-    isBooleanResponse:NO
-   ];
+  [PHPhotoLibrary requestAuthorization:^(PHAuthorizationStatus status) {
+    NSDictionary* options = [command.arguments objectAtIndex:0];
+    [self shareInternal:command
+            withOptions:options
+      isBooleanResponse:NO
+      ];
+  }];
 }
 
 - (void)shareInternal:(CDVInvokedUrlCommand*)command withOptions:(NSDictionary*)options isBooleanResponse:(BOOL)boolResponse {
@@ -92,7 +190,7 @@ static NSString *const kShareOptionIPadCoordinates = @"iPadCoordinates";
     NSMutableArray *activityItems = [[NSMutableArray alloc] init];
 
     if (message != (id)[NSNull null] && message != nil) {
-    [activityItems addObject:message];
+        [activityItems addObject:message];
     }
 
     if (filenames != (id)[NSNull null] && filenames != nil && filenames.count > 0) {
@@ -114,8 +212,15 @@ static NSString *const kShareOptionIPadCoordinates = @"iPadCoordinates";
     }
 
     UIActivity *activity = [[UIActivity alloc] init];
-    NSArray *applicationActivities = [[NSArray alloc] initWithObjects:activity, nil];
+    NSMutableArray *applicationActivities = [[NSMutableArray alloc] initWithObjects:activity, nil];
+    
+    if([PHPhotoLibrary authorizationStatus] == 3){
+        MyCustomActivity *aVCA = [[MyCustomActivity alloc]init];
+        [applicationActivities addObject: aVCA];
+    }
+
     UIActivityViewController *activityVC = [[UIActivityViewController alloc] initWithActivityItems:activityItems applicationActivities:applicationActivities];
+      
     if (subject != (id)[NSNull null] && subject != nil) {
       [activityVC setValue:subject forKey:@"subject"];
     }
@@ -148,7 +253,9 @@ static NSString *const kShareOptionIPadCoordinates = @"iPadCoordinates";
 #pragma GCC diagnostic warning "-Wdeprecated-declarations"
       }
 
-    NSArray * socialSharingExcludeActivities = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"SocialSharingExcludeActivities"];
+    NSMutableArray * socialSharingExcludeActivities = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"SocialSharingExcludeActivities"];
+    [socialSharingExcludeActivities addObject: @"com.apple.UIKit.activity.SaveToCameraRoll"];
+
     if (socialSharingExcludeActivities!=nil && [socialSharingExcludeActivities count] > 0) {
       activityVC.excludedActivityTypes = socialSharingExcludeActivities;
     }

@@ -58,6 +58,7 @@
 
     <framework src="Social.framework" weak="true" />
     <framework src="MessageUI.framework" weak="true" />
+    <source-file src="src/ios/DownArrow.png" />
   </platform>
 
   <!-- android -->
