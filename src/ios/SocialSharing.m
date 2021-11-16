@@ -213,10 +213,14 @@ static NSString *const kShareOptionIPadCoordinates = @"iPadCoordinates";
 
     UIActivity *activity = [[UIActivity alloc] init];
     NSMutableArray *applicationActivities = [[NSMutableArray alloc] initWithObjects:activity, nil];
-    
-    if([PHPhotoLibrary authorizationStatus] == 3){
-        MyCustomActivity *aVCA = [[MyCustomActivity alloc]init];
-        [applicationActivities addObject: aVCA];
+    // Changes done by Tajinder on 16/11/2021 tp support save image to JobProgress named album
+    // our custom save image option will be shown in file share option in case of image
+    if([PHPhotoLibrary authorizationStatus] == 3 && activityItems.count > 0) {
+        // Add Save image option (MyCustomActivity) only if we try to save image
+        if([self getImage:filenames[0]]){
+            MyCustomActivity *aVCA = [[MyCustomActivity alloc]init];
+            [applicationActivities addObject: aVCA];
+        }
     }
 
     UIActivityViewController *activityVC = [[UIActivityViewController alloc] initWithActivityItems:activityItems applicationActivities:applicationActivities];
