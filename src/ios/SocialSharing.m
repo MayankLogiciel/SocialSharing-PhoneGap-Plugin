@@ -6,12 +6,16 @@
 #import <MessageUI/MFMessageComposeViewController.h>
 #import <MessageUI/MFMailComposeViewController.h>
 #import <MobileCoreServices/MobileCoreServices.h>
+
+// Changes done by Tajinder on 16/11/2021 to support save image to JobProgress named album
+// This library added to support save image to JobProgress named album
 #import <Photos/Photos.h>
 
-@interface MyCustomActivity : UIActivity
+// Custom activity created to save image to JobProgress album
+@interface SaveImageCustomActivity : UIActivity
 @end
 
-@implementation MyCustomActivity
+@implementation SaveImageCustomActivity
 
 - (NSString *)activityType
 {
@@ -157,6 +161,8 @@ static NSString *const kShareOptionIPadCoordinates = @"iPadCoordinates";
 }
 
 - (void)shareWithOptions:(CDVInvokedUrlCommand*)command {
+// Changes done by Tajinder on 16/11/2021 to support save image to JobProgress named album
+// Requesting permissions for PhotoLibrary before opening File share option
   [PHPhotoLibrary requestAuthorization:^(PHAuthorizationStatus status) {
     NSDictionary* options = [command.arguments objectAtIndex:0];
     [self shareInternal:command
@@ -213,12 +219,13 @@ static NSString *const kShareOptionIPadCoordinates = @"iPadCoordinates";
 
     UIActivity *activity = [[UIActivity alloc] init];
     NSMutableArray *applicationActivities = [[NSMutableArray alloc] initWithObjects:activity, nil];
-    // Changes done by Tajinder on 16/11/2021 tp support save image to JobProgress named album
+    
+    // Changes done by Tajinder on 16/11/2021 to support save image to JobProgress named album
     // our custom save image option will be shown in file share option in case of image
     if([PHPhotoLibrary authorizationStatus] == 3 && activityItems.count > 0) {
-        // Add Save image option (MyCustomActivity) only if we try to save image
+        // Add Save image option (SaveImageCustomActivity) only if we try to save image
         if([self getImage:filenames[0]]){
-            MyCustomActivity *aVCA = [[MyCustomActivity alloc]init];
+            SaveImageCustomActivity *aVCA = [[SaveImageCustomActivity alloc]init];
             [applicationActivities addObject: aVCA];
         }
     }
@@ -256,7 +263,9 @@ static NSString *const kShareOptionIPadCoordinates = @"iPadCoordinates";
         }];
 #pragma GCC diagnostic warning "-Wdeprecated-declarations"
       }
-
+    
+    // Changes done by Tajinder on 16/11/2021 to support save image to JobProgress named album
+    // Removing Default Save Image activity option
     NSMutableArray * socialSharingExcludeActivities = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"SocialSharingExcludeActivities"];
     [socialSharingExcludeActivities addObject: @"com.apple.UIKit.activity.SaveToCameraRoll"];
 
